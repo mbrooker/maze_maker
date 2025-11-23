@@ -43,6 +43,7 @@ impl CylinderMesh {
                 };
 
                 // Create quad vertices for this cell (horizontal surface)
+                // Normal points outward (radially for cylinder surface)
                 let base_idx = vertices.len() as u32;
 
                 // Bottom-left
@@ -66,6 +67,7 @@ impl CylinderMesh {
                 vertices.push([x3, y_next, z3]);
 
                 // Create two triangles for the quad
+                // Looking from outside: bottom-left -> bottom-right -> top-right (CCW)
                 indices.extend_from_slice(&[
                     base_idx,
                     base_idx + 1,
@@ -83,6 +85,7 @@ impl CylinderMesh {
 
                     if right_cell == Cell::Wall {
                         // Create vertical wall on the right edge (at next_angle)
+                        // This wall faces counter-clockwise (toward decreasing angle)
                         let wall_idx = vertices.len() as u32;
 
                         let x_inner = inner_radius * next_angle.cos();
@@ -95,13 +98,14 @@ impl CylinderMesh {
                         vertices.push([x_outer, y_next, z_outer]);
                         vertices.push([x_inner, y_next, z_inner]);
 
+                        // Looking from path (CCW direction): inner-bottom -> inner-top -> outer-top
                         indices.extend_from_slice(&[
                             wall_idx,
-                            wall_idx + 1,
+                            wall_idx + 3,
                             wall_idx + 2,
                             wall_idx,
                             wall_idx + 2,
-                            wall_idx + 3,
+                            wall_idx + 1,
                         ]);
                     }
 
@@ -111,6 +115,7 @@ impl CylinderMesh {
 
                     if left_cell == Cell::Wall {
                         // Create vertical wall on the left edge (at angle)
+                        // This wall faces clockwise (toward increasing angle)
                         let wall_idx = vertices.len() as u32;
 
                         let x_inner = inner_radius * angle.cos();
@@ -123,6 +128,7 @@ impl CylinderMesh {
                         vertices.push([x_outer, y_next, z_outer]);
                         vertices.push([x_inner, y_next, z_inner]);
 
+                        // Looking from path (CW direction): inner-bottom -> outer-bottom -> outer-top
                         indices.extend_from_slice(&[
                             wall_idx,
                             wall_idx + 1,
@@ -139,6 +145,7 @@ impl CylinderMesh {
 
                         if top_cell == Cell::Wall {
                             // Create horizontal wall on the top edge (at y)
+                            // Normal points downward (negative Y, into the path below)
                             let wall_idx = vertices.len() as u32;
 
                             let x0_inner = inner_radius * angle.cos();
@@ -155,13 +162,14 @@ impl CylinderMesh {
                             vertices.push([x1_outer, y, z1_outer]);
                             vertices.push([x0_outer, y, z0_outer]);
 
+                            // Looking from below (path side): inner-left -> outer-left -> outer-right (CCW)
                             indices.extend_from_slice(&[
                                 wall_idx,
-                                wall_idx + 1,
+                                wall_idx + 3,
                                 wall_idx + 2,
                                 wall_idx,
                                 wall_idx + 2,
-                                wall_idx + 3,
+                                wall_idx + 1,
                             ]);
                         }
                     }
@@ -172,6 +180,7 @@ impl CylinderMesh {
 
                         if bottom_cell == Cell::Wall {
                             // Create horizontal wall on the bottom edge (at y_next)
+                            // Normal points upward (positive Y, into the path above)
                             let wall_idx = vertices.len() as u32;
 
                             let x0_inner = inner_radius * angle.cos();
@@ -188,6 +197,7 @@ impl CylinderMesh {
                             vertices.push([x1_outer, y_next, z1_outer]);
                             vertices.push([x0_outer, y_next, z0_outer]);
 
+                            // Looking from above (path side): inner-left -> inner-right -> outer-right (CCW)
                             indices.extend_from_slice(&[
                                 wall_idx,
                                 wall_idx + 1,
@@ -200,6 +210,68 @@ impl CylinderMesh {
                     }
                 }
             }
+        }
+
+        // Add end caps (top and bottom)
+        let y_top = 0.0;
+        let y_bottom = rows as f32;
+
+        // Top cap (y = 0) - normal points up (negative Y direction, outward from solid)
+        for col in 0..cols {
+            let angle = (col as f32 / cols as f32) * 2.0 * PI;
+            let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
+
+            let cell = grid[0][col];
+            let radius = match cell {
+                Cell::Wall => outer_radius,
+                Cell::Path => inner_radius,
+            };
+
+            let cap_idx = vertices.len() as u32;
+
+            // Center point
+            vertices.push([0.0, y_top, 0.0]);
+
+            // Edge points
+            let x0 = radius * angle.cos();
+            let z0 = radius * angle.sin();
+            vertices.push([x0, y_top, z0]);
+
+            let x1 = radius * next_angle.cos();
+            let z1 = radius * next_angle.sin();
+            vertices.push([x1, y_top, z1]);
+
+            // Looking from above: center -> right edge -> left edge (CCW)
+            indices.extend_from_slice(&[cap_idx, cap_idx + 1, cap_idx + 2]);
+        }
+
+        // Bottom cap (y = rows) - normal points down (positive Y direction, outward from solid)
+        for col in 0..cols {
+            let angle = (col as f32 / cols as f32) * 2.0 * PI;
+            let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
+
+            let cell = grid[rows - 1][col];
+            let radius = match cell {
+                Cell::Wall => outer_radius,
+                Cell::Path => inner_radius,
+            };
+
+            let cap_idx = vertices.len() as u32;
+
+            // Center point
+            vertices.push([0.0, y_bottom, 0.0]);
+
+            // Edge points
+            let x0 = radius * angle.cos();
+            let z0 = radius * angle.sin();
+            vertices.push([x0, y_bottom, z0]);
+
+            let x1 = radius * next_angle.cos();
+            let z1 = radius * next_angle.sin();
+            vertices.push([x1, y_bottom, z1]);
+
+            // Looking from below: center -> left edge -> right edge (CCW)
+            indices.extend_from_slice(&[cap_idx, cap_idx + 2, cap_idx + 1]);
         }
 
         CylinderMesh { vertices, indices }
