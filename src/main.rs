@@ -5,8 +5,8 @@ use maze::CylinderMaze;
 use three_d::CylinderMesh;
 
 fn main() {
-    let rows = 20;
-    let cols = 40;
+    let rows = 10;
+    let cols = 10;
 
     let mut maze = CylinderMaze::new(rows, cols);
     let (start, end) = maze.generate_wilson();

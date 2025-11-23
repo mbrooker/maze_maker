@@ -11,7 +11,7 @@ pub struct CylinderMesh {
 impl CylinderMesh {
     /// Generate a 3D cylindrical mesh from a CylinderMaze
     /// The maze wraps around the cylinder horizontally
-    /// Walls are extruded outward from the cylinder surface
+    /// Walls are at the full outer diameter, paths are embossed inward
     pub fn from_maze(maze: &CylinderMaze, wall_height: f32) -> Self {
         let grid = maze.grid();
         let rows = grid.len();
@@ -19,87 +19,61 @@ impl CylinderMesh {
 
         // Calculate cylinder dimensions from maze
         let circumference = cols as f32;
-        let radius = circumference / (2.0 * PI);
+        let outer_radius = circumference / (2.0 * PI);
+        let inner_radius = outer_radius - wall_height;
 
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
 
-        // Generate vertices for each cell in the maze grid
+        // Generate mesh by creating quads for each cell
         for row in 0..rows {
             for col in 0..cols {
                 let cell = grid[row][col];
 
-                // Calculate position on cylinder
+                // Calculate angular position
                 let angle = (col as f32 / cols as f32) * 2.0 * PI;
+                let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
                 let y = row as f32;
+                let y_next = (row + 1) as f32;
 
-                match cell {
-                    Cell::Wall => {
-                        // Create extruded wall geometry
-                        let base_idx = vertices.len() as u32;
+                // Choose radius based on cell type
+                let radius = match cell {
+                    Cell::Wall => outer_radius,  // Walls at full diameter
+                    Cell::Path => inner_radius,  // Paths embossed inward
+                };
 
-                        // Inner surface (at cylinder radius)
-                        let x_inner = radius * angle.cos();
-                        let z_inner = radius * angle.sin();
-                        vertices.push([x_inner, y, z_inner]);
+                // Create quad vertices for this cell
+                let base_idx = vertices.len() as u32;
 
-                        // Outer surface (extruded)
-                        let outer_radius = radius + wall_height;
-                        let x_outer = outer_radius * angle.cos();
-                        let z_outer = outer_radius * angle.sin();
-                        vertices.push([x_outer, y, z_outer]);
+                // Bottom-left
+                let x0 = radius * angle.cos();
+                let z0 = radius * angle.sin();
+                vertices.push([x0, y, z0]);
 
-                        // Create quad faces for walls
-                        if col < cols - 1 {
-                            let next_col = col + 1;
-                            let next_angle = (next_col as f32 / cols as f32) * 2.0 * PI;
+                // Bottom-right
+                let x1 = radius * next_angle.cos();
+                let z1 = radius * next_angle.sin();
+                vertices.push([x1, y, z1]);
 
-                            // Add vertices for next column
-                            let x_inner_next = radius * next_angle.cos();
-                            let z_inner_next = radius * next_angle.sin();
-                            vertices.push([x_inner_next, y, z_inner_next]);
+                // Top-right
+                let x2 = radius * next_angle.cos();
+                let z2 = radius * next_angle.sin();
+                vertices.push([x2, y_next, z2]);
 
-                            let x_outer_next = outer_radius * next_angle.cos();
-                            let z_outer_next = outer_radius * next_angle.sin();
-                            vertices.push([x_outer_next, y, z_outer_next]);
+                // Top-left
+                let x3 = radius * angle.cos();
+                let z3 = radius * angle.sin();
+                vertices.push([x3, y_next, z3]);
 
-                            // Outer face (two triangles)
-                            indices.extend_from_slice(&[
-                                base_idx + 1,
-                                base_idx + 3,
-                                base_idx + 2,
-                                base_idx + 1,
-                                base_idx + 2,
-                                base_idx,
-                            ]);
-                        }
-
-                        // Connect top and bottom if adjacent rows are also walls
-                        if row < rows - 1 && grid[row + 1][col] == Cell::Wall {
-                            let next_row_base = vertices.len() as u32;
-
-                            let y_next = (row + 1) as f32;
-                            vertices.push([x_inner, y_next, z_inner]);
-                            vertices.push([x_outer, y_next, z_outer]);
-
-                            // Side faces
-                            indices.extend_from_slice(&[
-                                base_idx + 1,
-                                next_row_base + 1,
-                                next_row_base,
-                                base_idx + 1,
-                                next_row_base,
-                                base_idx,
-                            ]);
-                        }
-                    }
-                    Cell::Path => {
-                        // Paths are just the cylinder surface (no extrusion)
-                        let x = radius * angle.cos();
-                        let z = radius * angle.sin();
-                        vertices.push([x, y, z]);
-                    }
-                }
+                // Create two triangles for the quad
+                indices.extend_from_slice(&[
+                    base_idx,
+                    base_idx + 1,
+                    base_idx + 2,
+                    base_idx,
+                    base_idx + 2,
+                    base_idx + 3,
+                ]);
             }
         }
 
