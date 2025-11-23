@@ -38,11 +38,11 @@ impl CylinderMesh {
 
                 // Choose radius based on cell type
                 let radius = match cell {
-                    Cell::Wall => outer_radius,  // Walls at full diameter
-                    Cell::Path => inner_radius,  // Paths embossed inward
+                    Cell::Wall => outer_radius, // Walls at full diameter
+                    Cell::Path => inner_radius, // Paths embossed inward
                 };
 
-                // Create quad vertices for this cell
+                // Create quad vertices for this cell (horizontal surface)
                 let base_idx = vertices.len() as u32;
 
                 // Bottom-left
@@ -74,6 +74,131 @@ impl CylinderMesh {
                     base_idx + 2,
                     base_idx + 3,
                 ]);
+
+                // Add vertical walls at transitions between path and wall
+                if cell == Cell::Path {
+                    // Check right neighbor (wrapping around)
+                    let next_col = (col + 1) % cols;
+                    let right_cell = grid[row][next_col];
+
+                    if right_cell == Cell::Wall {
+                        // Create vertical wall on the right edge (at next_angle)
+                        let wall_idx = vertices.len() as u32;
+
+                        let x_inner = inner_radius * next_angle.cos();
+                        let z_inner = inner_radius * next_angle.sin();
+                        let x_outer = outer_radius * next_angle.cos();
+                        let z_outer = outer_radius * next_angle.sin();
+
+                        vertices.push([x_inner, y, z_inner]);
+                        vertices.push([x_outer, y, z_outer]);
+                        vertices.push([x_outer, y_next, z_outer]);
+                        vertices.push([x_inner, y_next, z_inner]);
+
+                        indices.extend_from_slice(&[
+                            wall_idx,
+                            wall_idx + 1,
+                            wall_idx + 2,
+                            wall_idx,
+                            wall_idx + 2,
+                            wall_idx + 3,
+                        ]);
+                    }
+
+                    // Check left neighbor (wrapping around)
+                    let prev_col = if col == 0 { cols - 1 } else { col - 1 };
+                    let left_cell = grid[row][prev_col];
+
+                    if left_cell == Cell::Wall {
+                        // Create vertical wall on the left edge (at angle)
+                        let wall_idx = vertices.len() as u32;
+
+                        let x_inner = inner_radius * angle.cos();
+                        let z_inner = inner_radius * angle.sin();
+                        let x_outer = outer_radius * angle.cos();
+                        let z_outer = outer_radius * angle.sin();
+
+                        vertices.push([x_inner, y, z_inner]);
+                        vertices.push([x_outer, y, z_outer]);
+                        vertices.push([x_outer, y_next, z_outer]);
+                        vertices.push([x_inner, y_next, z_inner]);
+
+                        indices.extend_from_slice(&[
+                            wall_idx,
+                            wall_idx + 1,
+                            wall_idx + 2,
+                            wall_idx,
+                            wall_idx + 2,
+                            wall_idx + 3,
+                        ]);
+                    }
+
+                    // Check top neighbor
+                    if row > 0 {
+                        let top_cell = grid[row - 1][col];
+
+                        if top_cell == Cell::Wall {
+                            // Create horizontal wall on the top edge (at y)
+                            let wall_idx = vertices.len() as u32;
+
+                            let x0_inner = inner_radius * angle.cos();
+                            let z0_inner = inner_radius * angle.sin();
+                            let x1_inner = inner_radius * next_angle.cos();
+                            let z1_inner = inner_radius * next_angle.sin();
+                            let x0_outer = outer_radius * angle.cos();
+                            let z0_outer = outer_radius * angle.sin();
+                            let x1_outer = outer_radius * next_angle.cos();
+                            let z1_outer = outer_radius * next_angle.sin();
+
+                            vertices.push([x0_inner, y, z0_inner]);
+                            vertices.push([x1_inner, y, z1_inner]);
+                            vertices.push([x1_outer, y, z1_outer]);
+                            vertices.push([x0_outer, y, z0_outer]);
+
+                            indices.extend_from_slice(&[
+                                wall_idx,
+                                wall_idx + 1,
+                                wall_idx + 2,
+                                wall_idx,
+                                wall_idx + 2,
+                                wall_idx + 3,
+                            ]);
+                        }
+                    }
+
+                    // Check bottom neighbor
+                    if row < rows - 1 {
+                        let bottom_cell = grid[row + 1][col];
+
+                        if bottom_cell == Cell::Wall {
+                            // Create horizontal wall on the bottom edge (at y_next)
+                            let wall_idx = vertices.len() as u32;
+
+                            let x0_inner = inner_radius * angle.cos();
+                            let z0_inner = inner_radius * angle.sin();
+                            let x1_inner = inner_radius * next_angle.cos();
+                            let z1_inner = inner_radius * next_angle.sin();
+                            let x0_outer = outer_radius * angle.cos();
+                            let z0_outer = outer_radius * angle.sin();
+                            let x1_outer = outer_radius * next_angle.cos();
+                            let z1_outer = outer_radius * next_angle.sin();
+
+                            vertices.push([x0_inner, y_next, z0_inner]);
+                            vertices.push([x1_inner, y_next, z1_inner]);
+                            vertices.push([x1_outer, y_next, z1_outer]);
+                            vertices.push([x0_outer, y_next, z0_outer]);
+
+                            indices.extend_from_slice(&[
+                                wall_idx,
+                                wall_idx + 1,
+                                wall_idx + 2,
+                                wall_idx,
+                                wall_idx + 2,
+                                wall_idx + 3,
+                            ]);
+                        }
+                    }
+                }
             }
         }
 
@@ -118,7 +243,8 @@ impl CylinderMesh {
                 ];
 
                 // Normalize
-                let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+                let length =
+                    (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
                 let normal = if length > 0.0 {
                     [normal[0] / length, normal[1] / length, normal[2] / length]
                 } else {
