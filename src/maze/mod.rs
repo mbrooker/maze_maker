@@ -26,6 +26,10 @@ impl CylinderMaze {
         }
     }
 
+    pub fn grid(&self) -> &Vec<Vec<Cell>> {
+        &self.grid
+    }
+
     fn cell_to_grid(&self, row: usize, col: usize) -> (usize, usize) {
         (2 * row + 1, 2 * col + 1)
     }
