@@ -5,6 +5,4 @@ edition = "2024"
 
 [dependencies]
 rand = "0.8"
-stl_io = "0.10.0"
-csgrs = { version = "0.20", metaballs = false, dxf-io = false, chull-io = false }
 anyhow = "1.0"

@@ -3,7 +3,7 @@ mod three_d;
 
 use anyhow::Result;
 use maze::CylinderMaze;
-use three_d::{make_outer_openscad, make_outer_stl, maze_to_openscad, maze_to_stl};
+use three_d::{make_outer_openscad, maze_to_openscad};
 
 fn main() -> Result<()> {
     let rows = 10;
@@ -18,8 +18,8 @@ fn main() -> Result<()> {
     maze.display(start, end);
 
     println!("\nMaze is solvable: {}", maze.can_solve(start, end));
-    maze_to_stl(&maze, 10.0, "cylinder_maze")?;
-    make_outer_stl(10.0, maze.grid().len(), "cylinder_outer")?;
+    //maze_to_stl(&maze, 10.0, "cylinder_maze")?;
+    //make_outer_stl(10.0, maze.grid().len(), "cylinder_outer")?;
     maze_to_openscad(&maze, 3.0 * rows as f64, 3.0 * cols as f64, "cylinder_maze")?;
     make_outer_openscad(10.0, maze.grid().len(), "cylinder_outer")?;
     Ok(())

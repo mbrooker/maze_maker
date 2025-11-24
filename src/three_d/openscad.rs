@@ -13,33 +13,41 @@ pub fn maze_to_openscad(maze: &CylinderMaze, height: f64, circumfernce: f64, fil
 
     let mut scad = String::new();
     
-    // Start with difference operation
-    scad.push_str("difference() {\n");
+    // Define parameters
+    scad.push_str(&format!("radius = {};\n", radius));
+    scad.push_str(&format!("seg_scale_x = {};\n", seg_scale_x));
+    scad.push_str(&format!("seg_scale_z = {};\n", seg_scale_z));
+    scad.push_str(&format!("height = {};\n", height));
+    scad.push_str(&format!("rows = {};\n", grid.len()));
+    scad.push_str(&format!("cols = {};\n", grid[0].len()));
+    scad.push_str("\n");
     
-    // Main cylinder
-    scad.push_str(&format!("  cylinder(r={}, h={}, $fn=360);\n", radius, height));
-    
-    // Subtract path segments
-    scad.push_str("  union() {\n");
+    // Build maze data array - collect path cells
+    scad.push_str("// Maze data: [row, col] pairs for path cells\n");
+    scad.push_str("maze_paths = [\n");
     for row in 0..grid.len() {
         for col in 0..grid[row].len() {
             if grid[row][col] == Cell::Path {
-                let angle_deg = 360.0 * col as f64 / grid[row].len() as f64;
-                let z_pos = row as f64 * seg_scale_z;
-                
-                scad.push_str(&format!(
-                    "    rotate([0, 0, {}]) translate([{}, {}, {}]) cube([{}, {}, {}], center=false);\n",
-                    angle_deg,
-                    radius - seg_scale_x * 0.45,
-                    -seg_scale_x / 2.0,
-                    z_pos,
-                    seg_scale_x * 1.01,
-                    seg_scale_x,
-                    seg_scale_z * 1.01
-                ));
+                scad.push_str(&format!("  [{}, {}],\n", row, col));
             }
         }
     }
+    scad.push_str("];\n\n");
+    
+    // Generate the maze using OpenSCAD for loop
+    scad.push_str("difference() {\n");
+    scad.push_str("  cylinder(r=radius, h=height, $fn=360);\n");
+    scad.push_str("  \n");
+    scad.push_str("  // Carve out path segments\n");
+    scad.push_str("  for (path = maze_paths) {\n");
+    scad.push_str("    row = path[0];\n");
+    scad.push_str("    col = path[1];\n");
+    scad.push_str("    angle = 360 * col / cols;\n");
+    scad.push_str("    z_pos = row * seg_scale_z;\n");
+    scad.push_str("    \n");
+    scad.push_str("    rotate([0, 0, angle])\n");
+    scad.push_str("      translate([radius - seg_scale_x * 0.45, -seg_scale_x / 2, z_pos])\n");
+    scad.push_str("        cube([seg_scale_x * 1.01, seg_scale_x, seg_scale_z * 1.01]);\n");
     scad.push_str("  }\n");
     scad.push_str("}\n");
 
@@ -59,22 +67,24 @@ pub fn make_outer_openscad(scale: f64, height_cells: usize, filename: &str) -> R
 
     let mut scad = String::new();
     
+    // Define parameters
+    scad.push_str(&format!("inner_radius = {};\n", inner_radius));
+    scad.push_str(&format!("outer_radius = {};\n", outer_radius));
+    scad.push_str(&format!("seg_scale = {};\n", seg_scale));
+    scad.push_str(&format!("height = {};\n", height));
+    scad.push_str("\n");
+    
     scad.push_str("union() {\n");
     
     // Hollow cylinder (outer - inner)
     scad.push_str("  difference() {\n");
-    scad.push_str(&format!("    cylinder(r={}, h={}, $fn=360);\n", outer_radius, height));
-    scad.push_str(&format!("    cylinder(r={}, h={}, $fn=360);\n", inner_radius, height));
+    scad.push_str("    cylinder(r=outer_radius, h=height, $fn=360);\n");
+    scad.push_str("    cylinder(r=inner_radius, h=height, $fn=360);\n");
     scad.push_str("  }\n");
     
     // Base
-    scad.push_str(&format!(
-        "  translate([0, 0, {}]) cylinder(r={}, h={}, $fn=360);\n",
-        -seg_scale * 0.99,
-        outer_radius * 1.1,
-        seg_scale
-    ));
-    
+    scad.push_str("  translate([0, 0, -seg_scale * 0.99])\n");
+    scad.push_str("    cylinder(r=outer_radius * 1.1, h=seg_scale, $fn=360);\n");
     scad.push_str("}\n");
 
     std::fs::write(format!("{}.scad", filename), scad)?;
