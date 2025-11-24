@@ -112,11 +112,11 @@ pub fn make_outer_openscad(
     // Tooth on outer wall at top
     scad.push_str("  // Tooth on outer wall at top\n");
     scad.push_str(
-        "  translate([- outer_radius + seg_scale_x * 0.35, 0, height - seg_scale_z * 0.45])\n",
+        "  translate([- inner_radius, 0, height - seg_scale_z * 0.45])\n",
     );
     scad.push_str("   scale([seg_scale_x, seg_scale_x, seg_scale_z])\n");
     scad.push_str("    rotate([0, 90, 0])\n");
-    scad.push_str("      cylinder(r1=0.30, r2=0.3 * 0.8, h=0.30, $fn=36);\n");
+    scad.push_str("      cylinder(r1=0.40, r2=0.4 * 0.8, h=0.40, $fn=36);\n");
 
     scad.push_str("}\n");
 
