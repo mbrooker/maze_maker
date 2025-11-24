@@ -1,8 +1,12 @@
+mod openscad;
+
+pub use openscad::{make_outer_openscad, maze_to_openscad};
+
 use crate::maze::{Cell, CylinderMaze};
 use anyhow::Result;
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::TAU;
 
-use csgrs::{traits::CSG};
+use csgrs::traits::CSG;
 
 type Mesh = csgrs::mesh::Mesh<()>;
 type Sketch = csgrs::sketch::Sketch<()>;
@@ -35,14 +39,21 @@ pub fn maze_to_stl(maze: &CylinderMaze, scale: f64, filename: &str) -> Result<()
         Mesh::cylinder(radius * 1.1, seg_scale, 1024, None).translate(0.0, 0.0, -seg_scale * 0.99);
     cylinder = base.union(&cylinder);
     println!("Generating whole STL");
-    std::fs::write(format!("{}_whole.stl", filename), cylinder.to_stl_binary("my_solid")?)?;
+    std::fs::write(
+        format!("{}_whole.stl", filename),
+        cylinder.to_stl_binary("my_solid")?,
+    )?;
 
     let cube_scale = 3.0 * radius;
-    let cutter = Mesh::cube(1.0, None).scale(cube_scale, cube_scale, height).translate(0.0, -cube_scale / 2.0, 0.0);
+    let cutter = Mesh::cube(1.0, None)
+        .scale(cube_scale, cube_scale, height)
+        .translate(0.0, -cube_scale / 2.0, 0.0);
     println!("Generating left STL");
     let left_mesh = cylinder.intersection(&cutter);
-    std::fs::write(format!("{}_left.stl", filename), left_mesh.to_stl_binary("my_solid")?)?;
-
+    std::fs::write(
+        format!("{}_left.stl", filename),
+        left_mesh.to_stl_binary("my_solid")?,
+    )?;
 
     Ok(())
 }
@@ -61,12 +72,14 @@ pub fn make_outer_stl(scale: f64, height_cells: usize, filename: &str) -> Result
         0.0,
         -seg_scale * 0.99,
     );
-    let bottom_width = seg_scale*0.45;
-    let top_width = seg_scale*0.375;
-    let tooth = Sketch::trapezoid(top_width, bottom_width , seg_scale*0.6, 0.0, None)
-        .translate(0.0, -bottom_width / 2.0, 0.0);
-    let tooth_3d = tooth.revolve(360.0, 10).unwrap();//.translate(0.0, -inner_radius, height - bottom_width);
-
+    let bottom_width = seg_scale * 0.45;
+    let top_width = seg_scale * 0.375;
+    let tooth = Sketch::trapezoid(top_width, bottom_width, seg_scale * 0.6, 0.0, None).translate(
+        0.0,
+        -bottom_width / 2.0,
+        0.0,
+    );
+    let tooth_3d = tooth.revolve(360.0, 10).unwrap(); //.translate(0.0, -inner_radius, height - bottom_width);
 
     let stl = outer_cylinder
         .difference(&inner_cylinder)
@@ -74,7 +87,6 @@ pub fn make_outer_stl(scale: f64, height_cells: usize, filename: &str) -> Result
         //.union(&tooth_3d)
         .to_stl_binary("outer_cyl")?;
     std::fs::write(format!("{}.stl", filename), stl)?;
-
 
     Ok(())
 }

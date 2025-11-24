@@ -1,3 +1,4 @@
 /target
 *.stl
 *.lock
+*.scad
