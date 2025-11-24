@@ -19,21 +19,21 @@ pub fn maze_to_openscad(
     let mut scad = String::new();
 
     // Define parameters
-    scad.push_str(&format!("radius = {};\n", radius));
-    scad.push_str(&format!("seg_scale_x = {};\n", seg_scale_x));
-    scad.push_str(&format!("seg_scale_z = {};\n", seg_scale_z));
-    scad.push_str(&format!("height = {};\n", height));
+    scad.push_str(&format!("radius = {radius};\n"));
+    scad.push_str(&format!("seg_scale_x = {seg_scale_x};\n"));
+    scad.push_str(&format!("seg_scale_z = {seg_scale_z};\n"));
+    scad.push_str(&format!("height = {height};\n"));
     scad.push_str(&format!("rows = {};\n", grid.len()));
     scad.push_str(&format!("cols = {};\n", grid[0].len()));
-    scad.push_str("\n");
+    scad.push('\n');
 
     // Build maze data array - collect path cells
     scad.push_str("// Maze data: [row, col] pairs for path cells\n");
     scad.push_str("maze_paths = [\n");
-    for row in 0..grid.len() {
-        for col in 0..grid[row].len() {
-            if grid[row][col] == Cell::Path {
-                scad.push_str(&format!("  [{}, {}],\n", row, col));
+    for (row, row_cells) in grid.iter().enumerate() {
+        for (col, cell) in row_cells.iter().enumerate() {
+            if *cell == Cell::Path {
+                scad.push_str(&format!("  [{row}, {col}],\n"));
             }
         }
     }
@@ -57,7 +57,7 @@ pub fn maze_to_openscad(
     scad.push_str("}\n");
 
     // Write the whole model
-    std::fs::write(format!("{}_whole.scad", filename), &scad)?;
+    std::fs::write(format!("{filename}_whole.scad"), &scad)?;
 
     Ok(())
 }
@@ -71,10 +71,10 @@ pub fn make_outer_openscad(height: f64, circumference: f64, filename: &str) -> R
     let mut scad = String::new();
 
     // Define parameters
-    scad.push_str(&format!("inner_radius = {};\n", inner_radius));
-    scad.push_str(&format!("outer_radius = {};\n", outer_radius));
-    scad.push_str(&format!("height = {};\n", height));
-    scad.push_str("\n");
+    scad.push_str(&format!("inner_radius = {inner_radius};\n"));
+    scad.push_str(&format!("outer_radius = {outer_radius};\n"));
+    scad.push_str(&format!("height = {height};\n"));
+    scad.push('\n');
 
     scad.push_str("union() {\n");
 
@@ -89,7 +89,7 @@ pub fn make_outer_openscad(height: f64, circumference: f64, filename: &str) -> R
     scad.push_str("    cylinder(r=outer_radius * 1.1, h=height * 0.05, $fn=360);\n");
     scad.push_str("}\n");
 
-    std::fs::write(format!("{}.scad", filename), scad)?;
+    std::fs::write(format!("{filename}.scad"), scad)?;
 
     Ok(())
 }
