@@ -63,10 +63,19 @@ pub fn maze_to_openscad(
 }
 
 /// Generate OpenSCAD code for the outer cylinder
-pub fn make_outer_openscad(height: f64, circumference: f64, filename: &str) -> Result<()> {
+pub fn make_outer_openscad(
+    height: f64,
+    circumference: f64,
+    rows: usize,
+    cols: usize,
+    filename: &str,
+) -> Result<()> {
     let radius = circumference / TAU;
     let inner_radius = radius + 0.5;
     let outer_radius = radius + 2.0;
+
+    let seg_scale_x = circumference / cols as f64;
+    let seg_scale_z = height / rows as f64;
 
     let mut scad = String::new();
 
@@ -74,6 +83,8 @@ pub fn make_outer_openscad(height: f64, circumference: f64, filename: &str) -> R
     scad.push_str(&format!("inner_radius = {inner_radius};\n"));
     scad.push_str(&format!("outer_radius = {outer_radius};\n"));
     scad.push_str(&format!("height = {height};\n"));
+    scad.push_str(&format!("seg_scale_x = {seg_scale_x};\n"));
+    scad.push_str(&format!("seg_scale_z = {seg_scale_z};\n"));
     scad.push('\n');
 
     scad.push_str("union() {\n");
@@ -81,12 +92,20 @@ pub fn make_outer_openscad(height: f64, circumference: f64, filename: &str) -> R
     // Hollow cylinder (outer - inner)
     scad.push_str("  difference() {\n");
     scad.push_str("    cylinder(r=outer_radius, h=height, $fn=360);\n");
-    scad.push_str("    cylinder(r=inner_radius, h=height, $fn=360);\n");
+    scad.push_str("    cylinder(r=inner_radius, h=height * 1.01, $fn=360);\n");
     scad.push_str("  }\n");
 
     // Base
     scad.push_str("  translate([0, 0, -height * 0.05])\n");
     scad.push_str("    cylinder(r=outer_radius * 1.1, h=height * 0.05, $fn=360);\n");
+
+    // Tooth on outer wall at top
+    scad.push_str("  // Tooth on outer wall at top\n");
+    scad.push_str("  translate([- outer_radius + seg_scale_x * 0.35, 0, height - seg_scale_z * 0.45])\n");
+    scad.push_str("   scale([seg_scale_x, seg_scale_x, seg_scale_z])\n");
+    scad.push_str("    rotate([0, 90, 0])\n");
+    scad.push_str("      cylinder(r1=0.30, r2=0.3 * 0.8, h=0.30, $fn=36);\n");
+
     scad.push_str("}\n");
 
     std::fs::write(format!("{filename}.scad"), scad)?;

@@ -51,6 +51,6 @@ fn main() -> Result<()> {
 
     println!("\nMaze is solvable: {}", maze.can_solve(start, end));
     maze_to_openscad(&maze, args.height, args.circumference, &args.maze_file)?;
-    make_outer_openscad(args.height, args.circumference, &args.outer_file)?;
+    make_outer_openscad(args.height, args.circumference, args.rows, args.cols, &args.outer_file)?;
     Ok(())
 }
