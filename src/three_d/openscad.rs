@@ -81,8 +81,8 @@ pub fn make_outer_openscad(
     filename: &str,
 ) -> Result<()> {
     let radius = circumference / TAU;
-    let inner_radius = radius + 0.5;
-    let outer_radius = radius + 2.0;
+    let inner_radius = radius + 0.2;
+    let outer_radius = (radius * 1.1).max(inner_radius + 1.2);
 
     let seg_scale_x = circumference / cols as f64;
     let seg_scale_z = height / rows as f64;
