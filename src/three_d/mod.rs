@@ -1,5 +1,5 @@
 use crate::maze::{Cell, CylinderMaze};
-use std::f32::consts::PI;
+use std::f32::consts::{TAU, PI};
 use std::fs::File;
 use std::io::BufWriter;
 
@@ -32,8 +32,8 @@ impl CylinderMesh {
                 let cell = grid[row][col];
 
                 // Calculate angular position
-                let angle = (col as f32 / cols as f32) * 2.0 * PI;
-                let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
+                let angle = (col as f32 / cols as f32) *TAU;
+                let next_angle = ((col + 1) as f32 / cols as f32) * TAU;
                 let y = row as f32;
                 let y_next = (row + 1) as f32;
 
@@ -173,6 +173,33 @@ impl CylinderMesh {
                                 wall_idx + 1,
                             ]);
                         }
+                    } else {
+                        // First row - always create horizontal wall at the top edge
+                        let wall_idx = vertices.len() as u32;
+
+                        let x0_inner = inner_radius * angle.cos();
+                        let z0_inner = inner_radius * angle.sin();
+                        let x1_inner = inner_radius * next_angle.cos();
+                        let z1_inner = inner_radius * next_angle.sin();
+                        let x0_outer = outer_radius * angle.cos();
+                        let z0_outer = outer_radius * angle.sin();
+                        let x1_outer = outer_radius * next_angle.cos();
+                        let z1_outer = outer_radius * next_angle.sin();
+
+                        vertices.push([x0_inner, y, z0_inner]);
+                        vertices.push([x1_inner, y, z1_inner]);
+                        vertices.push([x1_outer, y, z1_outer]);
+                        vertices.push([x0_outer, y, z0_outer]);
+
+                        // Looking from below (path side): inner-left -> outer-left -> outer-right (CCW)
+                        indices.extend_from_slice(&[
+                            wall_idx,
+                            wall_idx + 3,
+                            wall_idx + 2,
+                            wall_idx,
+                            wall_idx + 2,
+                            wall_idx + 1,
+                        ]);
                     }
 
                     // Check bottom neighbor
@@ -208,6 +235,33 @@ impl CylinderMesh {
                                 wall_idx + 3,
                             ]);
                         }
+                    } else {
+                        // Last row - always create horizontal wall at the bottom edge
+                        let wall_idx = vertices.len() as u32;
+
+                        let x0_inner = inner_radius * angle.cos();
+                        let z0_inner = inner_radius * angle.sin();
+                        let x1_inner = inner_radius * next_angle.cos();
+                        let z1_inner = inner_radius * next_angle.sin();
+                        let x0_outer = outer_radius * angle.cos();
+                        let z0_outer = outer_radius * angle.sin();
+                        let x1_outer = outer_radius * next_angle.cos();
+                        let z1_outer = outer_radius * next_angle.sin();
+
+                        vertices.push([x0_inner, y_next, z0_inner]);
+                        vertices.push([x1_inner, y_next, z1_inner]);
+                        vertices.push([x1_outer, y_next, z1_outer]);
+                        vertices.push([x0_outer, y_next, z0_outer]);
+
+                        // Looking from above (path side): inner-left -> inner-right -> outer-right (CCW)
+                        indices.extend_from_slice(&[
+                            wall_idx,
+                            wall_idx + 1,
+                            wall_idx + 2,
+                            wall_idx,
+                            wall_idx + 2,
+                            wall_idx + 3,
+                        ]);
                     }
                 }
             }
@@ -221,9 +275,10 @@ impl CylinderMesh {
         let y_flare_bottom = y_bottom + flare_depth;
 
         // Top cap (y = 0) - normal points up (negative Y direction, outward from solid)
+        // Use inner_radius for path cells (openings), outer_radius for walls
         for col in 0..cols {
-            let angle = (col as f32 / cols as f32) * 2.0 * PI;
-            let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
+            let angle = (col as f32 / cols as f32) * TAU;
+            let next_angle = ((col + 1) as f32 / cols as f32) * TAU;
 
             let cell = grid[0][col];
             let radius = match cell {
@@ -250,25 +305,20 @@ impl CylinderMesh {
         }
 
         // Flared bottom section - transition from outer_radius to flare_radius
+        // Always use outer_radius at the top to ensure proper connection
         for col in 0..cols {
             let angle = (col as f32 / cols as f32) * 2.0 * PI;
             let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
 
-            let cell = grid[rows - 1][col];
-            let radius = match cell {
-                Cell::Wall => outer_radius,
-                Cell::Path => inner_radius,
-            };
-
             let flare_idx = vertices.len() as u32;
 
-            // Top edge of flare (at maze bottom)
-            let x0_top = radius * angle.cos();
-            let z0_top = radius * angle.sin();
+            // Top edge of flare (at maze bottom) - always at outer_radius
+            let x0_top = outer_radius * angle.cos();
+            let z0_top = outer_radius * angle.sin();
             vertices.push([x0_top, y_bottom, z0_top]);
 
-            let x1_top = radius * next_angle.cos();
-            let z1_top = radius * next_angle.sin();
+            let x1_top = outer_radius * next_angle.cos();
+            let z1_top = outer_radius * next_angle.sin();
             vertices.push([x1_top, y_bottom, z1_top]);
 
             // Bottom edge of flare (expanded)
@@ -520,40 +570,27 @@ impl CylinderMesh {
             ]);
         }
 
-        // Bottom ring at flare base (connecting inner and outer at y_flare_bottom)
+        // Close the bottom with a solid cap at y_flare_bottom
         for i in 0..segments {
             let angle = (i as f32 / segments as f32) * 2.0 * PI;
             let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
 
-            let ring_idx = vertices.len() as u32;
+            let cap_idx = vertices.len() as u32;
 
-            // Inner edge
-            let x0_inner = flare_radius * angle.cos();
-            let z0_inner = flare_radius * angle.sin();
-            vertices.push([x0_inner, y_flare_bottom, z0_inner]);
+            // Center point
+            vertices.push([0.0, y_flare_bottom, 0.0]);
 
-            let x1_inner = flare_radius * next_angle.cos();
-            let z1_inner = flare_radius * next_angle.sin();
-            vertices.push([x1_inner, y_flare_bottom, z1_inner]);
+            // Outer edge points
+            let x0 = shell_flare_radius * angle.cos();
+            let z0 = shell_flare_radius * angle.sin();
+            vertices.push([x0, y_flare_bottom, z0]);
 
-            // Outer edge
-            let x1_outer = shell_flare_radius * next_angle.cos();
-            let z1_outer = shell_flare_radius * next_angle.sin();
-            vertices.push([x1_outer, y_flare_bottom, z1_outer]);
+            let x1 = shell_flare_radius * next_angle.cos();
+            let z1 = shell_flare_radius * next_angle.sin();
+            vertices.push([x1, y_flare_bottom, z1]);
 
-            let x0_outer = shell_flare_radius * angle.cos();
-            let z0_outer = shell_flare_radius * angle.sin();
-            vertices.push([x0_outer, y_flare_bottom, z0_outer]);
-
-            // Bottom ring quad (normal points down)
-            indices.extend_from_slice(&[
-                ring_idx,
-                ring_idx + 1,
-                ring_idx + 2,
-                ring_idx,
-                ring_idx + 2,
-                ring_idx + 3,
-            ]);
+            // Bottom cap triangle (normal points down)
+            indices.extend_from_slice(&[cap_idx, cap_idx + 1, cap_idx + 2]);
         }
 
         CylinderMesh { vertices, indices }
