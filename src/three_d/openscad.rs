@@ -8,6 +8,7 @@ pub fn maze_to_openscad(
     height: f64,
     circumference: f64,
     filename: &str,
+    hollow: bool,
 ) -> Result<()> {
     let radius = circumference / TAU;
     let grid = maze.grid();
@@ -40,20 +41,29 @@ pub fn maze_to_openscad(
     scad.push_str("];\n\n");
 
     // Generate the maze using OpenSCAD for loop
-    scad.push_str("difference() {\n");
-    scad.push_str("  cylinder(r=radius, h=height, $fn=360);\n");
-    scad.push_str("  \n");
-    scad.push_str("  // Carve out path segments\n");
-    scad.push_str("  for (path = maze_paths) {\n");
-    scad.push_str("    row = path[0];\n");
-    scad.push_str("    col = path[1];\n");
-    scad.push_str("    angle = 360 * col / cols;\n");
-    scad.push_str("    z_pos = row * seg_scale_z;\n");
+    scad.push_str("union() {\n");
+    scad.push_str("  difference() {\n");
+    scad.push_str("    cylinder(r=radius, h=height, $fn=360);\n");
     scad.push_str("    \n");
-    scad.push_str("    rotate([0, 0, angle])\n");
-    scad.push_str("      translate([radius - seg_scale_x * 0.45, -seg_scale_x / 2, z_pos])\n");
-    scad.push_str("        cube([seg_scale_x * 1.01, seg_scale_x, seg_scale_z * 1.01]);\n");
+    scad.push_str("    // Carve out path segments\n");
+    scad.push_str("    for (path = maze_paths) {\n");
+    scad.push_str("      row = path[0];\n");
+    scad.push_str("      col = path[1];\n");
+    scad.push_str("      angle = 360 * col / cols;\n");
+    scad.push_str("      z_pos = row * seg_scale_z;\n");
+    scad.push_str("      \n");
+    scad.push_str("      rotate([0, 0, angle])\n");
+    scad.push_str("        translate([radius - seg_scale_x * 0.45, -seg_scale_x / 2, z_pos])\n");
+    scad.push_str("          cube([seg_scale_x * 1.01, seg_scale_x, seg_scale_z * 1.01]);\n");
+    scad.push_str("    }\n");
+    if hollow {
+        scad.push_str("    cylinder(r=radius-seg_scale_x, h=height+0.1, $fn=360);\n");
+    }
     scad.push_str("  }\n");
+    scad.push_str("  \n");
+    scad.push_str("  // Base\n");
+    scad.push_str("  translate([0, 0, -height * 0.05])\n");
+    scad.push_str("    cylinder(r=radius * 1.1, h=height * 0.05, $fn=360);\n");
     scad.push_str("}\n");
 
     // Write the whole model
@@ -101,7 +111,9 @@ pub fn make_outer_openscad(
 
     // Tooth on outer wall at top
     scad.push_str("  // Tooth on outer wall at top\n");
-    scad.push_str("  translate([- outer_radius + seg_scale_x * 0.35, 0, height - seg_scale_z * 0.45])\n");
+    scad.push_str(
+        "  translate([- outer_radius + seg_scale_x * 0.35, 0, height - seg_scale_z * 0.45])\n",
+    );
     scad.push_str("   scale([seg_scale_x, seg_scale_x, seg_scale_z])\n");
     scad.push_str("    rotate([0, 90, 0])\n");
     scad.push_str("      cylinder(r1=0.30, r2=0.3 * 0.8, h=0.30, $fn=36);\n");

@@ -19,11 +19,11 @@ struct Args {
     cols: usize,
 
     /// Height of the cylinder
-    #[arg(long, default_value_t = 30.0)]
+    #[arg(long, default_value_t = 60.0)]
     height: f64,
 
     /// Circumference of the cylinder
-    #[arg(long, default_value_t = 60.0)]
+    #[arg(long, default_value_t = 100.0)]
     circumference: f64,
 
     /// Base filename for the maze output
@@ -33,6 +33,10 @@ struct Args {
     /// Base filename for the outer cylinder output
     #[arg(long, default_value = "cylinder_outer")]
     outer_file: String,
+
+    /// Hollow out the inside of the cylinder, to make a container
+    #[arg(long)]
+    hollow: bool,
 }
 
 fn main() -> Result<()> {
@@ -50,7 +54,7 @@ fn main() -> Result<()> {
     maze.display(start, end);
 
     println!("\nMaze is solvable: {}", maze.can_solve(start, end));
-    maze_to_openscad(&maze, args.height, args.circumference, &args.maze_file)?;
+    maze_to_openscad(&maze, args.height, args.circumference, &args.maze_file, args.hollow)?;
     make_outer_openscad(args.height, args.circumference, args.rows, args.cols, &args.outer_file)?;
     Ok(())
 }
