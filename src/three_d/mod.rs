@@ -12,6 +12,7 @@ impl CylinderMesh {
     /// Generate a 3D cylindrical mesh from a CylinderMaze
     /// The maze wraps around the cylinder horizontally
     /// Walls are at the full outer diameter, paths are embossed inward
+    /// Includes a flared bottom base
     pub fn from_maze(maze: &CylinderMaze, wall_height: f32) -> Self {
         let grid = maze.grid();
         let rows = grid.len();
@@ -215,6 +216,9 @@ impl CylinderMesh {
         // Add end caps (top and bottom)
         let y_top = 0.0;
         let y_bottom = rows as f32;
+        let flare_depth = wall_height as f32;
+        let flare_radius = outer_radius + flare_depth;
+        let y_flare_bottom = y_bottom + flare_depth;
 
         // Top cap (y = 0) - normal points up (negative Y direction, outward from solid)
         for col in 0..cols {
@@ -245,7 +249,7 @@ impl CylinderMesh {
             indices.extend_from_slice(&[cap_idx, cap_idx + 1, cap_idx + 2]);
         }
 
-        // Bottom cap (y = rows) - normal points down (positive Y direction, outward from solid)
+        // Flared bottom section - transition from outer_radius to flare_radius
         for col in 0..cols {
             let angle = (col as f32 / cols as f32) * 2.0 * PI;
             let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
@@ -256,22 +260,300 @@ impl CylinderMesh {
                 Cell::Path => inner_radius,
             };
 
+            let flare_idx = vertices.len() as u32;
+
+            // Top edge of flare (at maze bottom)
+            let x0_top = radius * angle.cos();
+            let z0_top = radius * angle.sin();
+            vertices.push([x0_top, y_bottom, z0_top]);
+
+            let x1_top = radius * next_angle.cos();
+            let z1_top = radius * next_angle.sin();
+            vertices.push([x1_top, y_bottom, z1_top]);
+
+            // Bottom edge of flare (expanded)
+            let x1_bottom = flare_radius * next_angle.cos();
+            let z1_bottom = flare_radius * next_angle.sin();
+            vertices.push([x1_bottom, y_flare_bottom, z1_bottom]);
+
+            let x0_bottom = flare_radius * angle.cos();
+            let z0_bottom = flare_radius * angle.sin();
+            vertices.push([x0_bottom, y_flare_bottom, z0_bottom]);
+
+            // Create quad for flare surface (looking from outside)
+            indices.extend_from_slice(&[
+                flare_idx,
+                flare_idx + 1,
+                flare_idx + 2,
+                flare_idx,
+                flare_idx + 2,
+                flare_idx + 3,
+            ]);
+        }
+
+        // Bottom cap at flare base (y = y_flare_bottom) - normal points down
+        for col in 0..cols {
+            let angle = (col as f32 / cols as f32) * 2.0 * PI;
+            let next_angle = ((col + 1) as f32 / cols as f32) * 2.0 * PI;
+
             let cap_idx = vertices.len() as u32;
 
             // Center point
-            vertices.push([0.0, y_bottom, 0.0]);
+            vertices.push([0.0, y_flare_bottom, 0.0]);
 
-            // Edge points
-            let x0 = radius * angle.cos();
-            let z0 = radius * angle.sin();
-            vertices.push([x0, y_bottom, z0]);
+            // Edge points at flare radius
+            let x0 = flare_radius * angle.cos();
+            let z0 = flare_radius * angle.sin();
+            vertices.push([x0, y_flare_bottom, z0]);
 
-            let x1 = radius * next_angle.cos();
-            let z1 = radius * next_angle.sin();
-            vertices.push([x1, y_bottom, z1]);
+            let x1 = flare_radius * next_angle.cos();
+            let z1 = flare_radius * next_angle.sin();
+            vertices.push([x1, y_flare_bottom, z1]);
 
             // Looking from below: center -> left edge -> right edge (CCW)
             indices.extend_from_slice(&[cap_idx, cap_idx + 2, cap_idx + 1]);
+        }
+
+        CylinderMesh { vertices, indices }
+    }
+
+    /// Generate a solid outer cylinder that fits the maze inside
+    /// This creates a hollow cylinder with the maze's outer dimensions
+    pub fn outer_cylinder(maze: &CylinderMaze, wall_height: f32, wall_thickness: f32) -> Self {
+        let grid = maze.grid();
+        let rows = grid.len();
+        let cols = grid[0].len();
+
+        let circumference = cols as f32;
+        let outer_radius = circumference / (2.0 * PI);
+        let shell_outer_radius = outer_radius + wall_thickness;
+
+        let y_top = 0.0;
+        let y_bottom = rows as f32;
+        let flare_depth = wall_height;
+        let flare_radius = outer_radius + flare_depth;
+        let shell_flare_radius = flare_radius + wall_thickness;
+        let y_flare_bottom = y_bottom + flare_depth;
+
+        let segments = cols; // Use same resolution as maze
+
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        // Outer surface of cylinder
+        for i in 0..segments {
+            let angle = (i as f32 / segments as f32) * 2.0 * PI;
+            let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+
+            let base_idx = vertices.len() as u32;
+
+            // Top edge
+            let x0_top = shell_outer_radius * angle.cos();
+            let z0_top = shell_outer_radius * angle.sin();
+            vertices.push([x0_top, y_top, z0_top]);
+
+            let x1_top = shell_outer_radius * next_angle.cos();
+            let z1_top = shell_outer_radius * next_angle.sin();
+            vertices.push([x1_top, y_top, z1_top]);
+
+            // Bottom edge (at maze bottom, before flare)
+            let x1_bottom = shell_outer_radius * next_angle.cos();
+            let z1_bottom = shell_outer_radius * next_angle.sin();
+            vertices.push([x1_bottom, y_bottom, z1_bottom]);
+
+            let x0_bottom = shell_outer_radius * angle.cos();
+            let z0_bottom = shell_outer_radius * angle.sin();
+            vertices.push([x0_bottom, y_bottom, z0_bottom]);
+
+            // Outer surface quad
+            indices.extend_from_slice(&[
+                base_idx,
+                base_idx + 1,
+                base_idx + 2,
+                base_idx,
+                base_idx + 2,
+                base_idx + 3,
+            ]);
+        }
+
+        // Inner surface of cylinder
+        for i in 0..segments {
+            let angle = (i as f32 / segments as f32) * 2.0 * PI;
+            let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+
+            let base_idx = vertices.len() as u32;
+
+            // Top edge
+            let x0_top = outer_radius * angle.cos();
+            let z0_top = outer_radius * angle.sin();
+            vertices.push([x0_top, y_top, z0_top]);
+
+            let x1_top = outer_radius * next_angle.cos();
+            let z1_top = outer_radius * next_angle.sin();
+            vertices.push([x1_top, y_top, z1_top]);
+
+            // Bottom edge
+            let x1_bottom = outer_radius * next_angle.cos();
+            let z1_bottom = outer_radius * next_angle.sin();
+            vertices.push([x1_bottom, y_bottom, z1_bottom]);
+
+            let x0_bottom = outer_radius * angle.cos();
+            let z0_bottom = outer_radius * angle.sin();
+            vertices.push([x0_bottom, y_bottom, z0_bottom]);
+
+            // Inner surface quad (reversed winding)
+            indices.extend_from_slice(&[
+                base_idx,
+                base_idx + 3,
+                base_idx + 2,
+                base_idx,
+                base_idx + 2,
+                base_idx + 1,
+            ]);
+        }
+
+        // Top ring (connecting inner and outer at y_top)
+        for i in 0..segments {
+            let angle = (i as f32 / segments as f32) * 2.0 * PI;
+            let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+
+            let ring_idx = vertices.len() as u32;
+
+            // Inner edge
+            let x0_inner = outer_radius * angle.cos();
+            let z0_inner = outer_radius * angle.sin();
+            vertices.push([x0_inner, y_top, z0_inner]);
+
+            let x1_inner = outer_radius * next_angle.cos();
+            let z1_inner = outer_radius * next_angle.sin();
+            vertices.push([x1_inner, y_top, z1_inner]);
+
+            // Outer edge
+            let x1_outer = shell_outer_radius * next_angle.cos();
+            let z1_outer = shell_outer_radius * next_angle.sin();
+            vertices.push([x1_outer, y_top, z1_outer]);
+
+            let x0_outer = shell_outer_radius * angle.cos();
+            let z0_outer = shell_outer_radius * angle.sin();
+            vertices.push([x0_outer, y_top, z0_outer]);
+
+            // Top ring quad (normal points up)
+            indices.extend_from_slice(&[
+                ring_idx,
+                ring_idx + 3,
+                ring_idx + 2,
+                ring_idx,
+                ring_idx + 2,
+                ring_idx + 1,
+            ]);
+        }
+
+        // Flared bottom - outer surface
+        for i in 0..segments {
+            let angle = (i as f32 / segments as f32) * 2.0 * PI;
+            let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+
+            let flare_idx = vertices.len() as u32;
+
+            // Top of flare (at y_bottom)
+            let x0_top = shell_outer_radius * angle.cos();
+            let z0_top = shell_outer_radius * angle.sin();
+            vertices.push([x0_top, y_bottom, z0_top]);
+
+            let x1_top = shell_outer_radius * next_angle.cos();
+            let z1_top = shell_outer_radius * next_angle.sin();
+            vertices.push([x1_top, y_bottom, z1_top]);
+
+            // Bottom of flare (expanded)
+            let x1_bottom = shell_flare_radius * next_angle.cos();
+            let z1_bottom = shell_flare_radius * next_angle.sin();
+            vertices.push([x1_bottom, y_flare_bottom, z1_bottom]);
+
+            let x0_bottom = shell_flare_radius * angle.cos();
+            let z0_bottom = shell_flare_radius * angle.sin();
+            vertices.push([x0_bottom, y_flare_bottom, z0_bottom]);
+
+            // Outer flare surface
+            indices.extend_from_slice(&[
+                flare_idx,
+                flare_idx + 1,
+                flare_idx + 2,
+                flare_idx,
+                flare_idx + 2,
+                flare_idx + 3,
+            ]);
+        }
+
+        // Flared bottom - inner surface
+        for i in 0..segments {
+            let angle = (i as f32 / segments as f32) * 2.0 * PI;
+            let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+
+            let flare_idx = vertices.len() as u32;
+
+            // Top of flare (at y_bottom)
+            let x0_top = outer_radius * angle.cos();
+            let z0_top = outer_radius * angle.sin();
+            vertices.push([x0_top, y_bottom, z0_top]);
+
+            let x1_top = outer_radius * next_angle.cos();
+            let z1_top = outer_radius * next_angle.sin();
+            vertices.push([x1_top, y_bottom, z1_top]);
+
+            // Bottom of flare (expanded)
+            let x1_bottom = flare_radius * next_angle.cos();
+            let z1_bottom = flare_radius * next_angle.sin();
+            vertices.push([x1_bottom, y_flare_bottom, z1_bottom]);
+
+            let x0_bottom = flare_radius * angle.cos();
+            let z0_bottom = flare_radius * angle.sin();
+            vertices.push([x0_bottom, y_flare_bottom, z0_bottom]);
+
+            // Inner flare surface (reversed winding)
+            indices.extend_from_slice(&[
+                flare_idx,
+                flare_idx + 3,
+                flare_idx + 2,
+                flare_idx,
+                flare_idx + 2,
+                flare_idx + 1,
+            ]);
+        }
+
+        // Bottom ring at flare base (connecting inner and outer at y_flare_bottom)
+        for i in 0..segments {
+            let angle = (i as f32 / segments as f32) * 2.0 * PI;
+            let next_angle = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+
+            let ring_idx = vertices.len() as u32;
+
+            // Inner edge
+            let x0_inner = flare_radius * angle.cos();
+            let z0_inner = flare_radius * angle.sin();
+            vertices.push([x0_inner, y_flare_bottom, z0_inner]);
+
+            let x1_inner = flare_radius * next_angle.cos();
+            let z1_inner = flare_radius * next_angle.sin();
+            vertices.push([x1_inner, y_flare_bottom, z1_inner]);
+
+            // Outer edge
+            let x1_outer = shell_flare_radius * next_angle.cos();
+            let z1_outer = shell_flare_radius * next_angle.sin();
+            vertices.push([x1_outer, y_flare_bottom, z1_outer]);
+
+            let x0_outer = shell_flare_radius * angle.cos();
+            let z0_outer = shell_flare_radius * angle.sin();
+            vertices.push([x0_outer, y_flare_bottom, z0_outer]);
+
+            // Bottom ring quad (normal points down)
+            indices.extend_from_slice(&[
+                ring_idx,
+                ring_idx + 1,
+                ring_idx + 2,
+                ring_idx,
+                ring_idx + 2,
+                ring_idx + 3,
+            ]);
         }
 
         CylinderMesh { vertices, indices }

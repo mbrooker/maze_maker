@@ -138,6 +138,15 @@ impl CylinderMaze {
         let end_row = self.rows - 1;
         let end_col = rng.gen_range(0..self.cols);
 
+        // Open the top wall at the start position
+        let (_, start_grid_col) = self.cell_to_grid(start_row, start_col);
+        self.grid[0][start_grid_col] = Cell::Path;
+
+        // Open the bottom wall at the end position
+        let (_, end_grid_col) = self.cell_to_grid(end_row, end_col);
+        let bottom_row = self.grid.len() - 1;
+        self.grid[bottom_row][end_grid_col] = Cell::Path;
+
         ((start_row, start_col), (end_row, end_col))
     }
 

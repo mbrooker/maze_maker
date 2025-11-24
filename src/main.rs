@@ -26,14 +26,28 @@ fn main() {
 
     let wall_height = 0.5;
     let mesh = CylinderMesh::from_maze(&maze, wall_height);
-    println!("\n3D Mesh Generated:");
+    println!("\n3D Maze Mesh Generated:");
     println!("  Vertices: {}", mesh.vertices.len());
     println!("  Triangles: {}", mesh.indices.len() / 3);
 
-    // Export to STL file
+    // Export maze to STL file
     let filename = "cylinder_maze.stl";
     match mesh.export_stl(filename) {
-        Ok(_) => println!("\nSTL file exported successfully: {}", filename),
-        Err(e) => eprintln!("\nError exporting STL: {}", e),
+        Ok(_) => println!("\nMaze STL file exported successfully: {}", filename),
+        Err(e) => eprintln!("\nError exporting maze STL: {}", e),
+    }
+
+    // Generate outer cylinder shell
+    let wall_thickness = 1.0;
+    let outer_mesh = CylinderMesh::outer_cylinder(&maze, wall_height, wall_thickness);
+    println!("\n3D Outer Cylinder Mesh Generated:");
+    println!("  Vertices: {}", outer_mesh.vertices.len());
+    println!("  Triangles: {}", outer_mesh.indices.len() / 3);
+
+    // Export outer cylinder to STL file
+    let outer_filename = "cylinder_outer.stl";
+    match outer_mesh.export_stl(outer_filename) {
+        Ok(_) => println!("\nOuter cylinder STL file exported successfully: {}", outer_filename),
+        Err(e) => eprintln!("\nError exporting outer cylinder STL: {}", e),
     }
 }
