@@ -1,10 +1,11 @@
 mod maze;
 mod three_d;
 
+use anyhow::Result;
 use maze::CylinderMaze;
-use three_d::CylinderMesh;
+use three_d::maze_to_stl;
 
-fn main() {
+fn main() -> Result<()> {
     let rows = 10;
     let cols = 10;
 
@@ -17,37 +18,7 @@ fn main() {
     maze.display(start, end);
 
     println!("\nMaze is solvable: {}", maze.can_solve(start, end));
+    maze_to_stl(&maze, 1.0, "cylinder_maze.stl")?;
 
-    // Generate 3D cylinder mesh
-    let (height, diameter) = CylinderMesh::calculate_dimensions(&maze);
-    println!("\n3D Cylinder Dimensions:");
-    println!("  Height: {:.2}", height);
-    println!("  Diameter: {:.2}", diameter);
-
-    let wall_height = 0.5;
-    let mesh = CylinderMesh::from_maze(&maze, wall_height);
-    println!("\n3D Maze Mesh Generated:");
-    println!("  Vertices: {}", mesh.vertices.len());
-    println!("  Triangles: {}", mesh.indices.len() / 3);
-
-    // Export maze to STL file
-    let filename = "cylinder_maze.stl";
-    match mesh.export_stl(filename) {
-        Ok(_) => println!("\nMaze STL file exported successfully: {}", filename),
-        Err(e) => eprintln!("\nError exporting maze STL: {}", e),
-    }
-
-    // Generate outer cylinder shell
-    let wall_thickness = 1.0;
-    let outer_mesh = CylinderMesh::outer_cylinder(&maze, wall_height, wall_thickness);
-    println!("\n3D Outer Cylinder Mesh Generated:");
-    println!("  Vertices: {}", outer_mesh.vertices.len());
-    println!("  Triangles: {}", outer_mesh.indices.len() / 3);
-
-    // Export outer cylinder to STL file
-    let outer_filename = "cylinder_outer.stl";
-    match outer_mesh.export_stl(outer_filename) {
-        Ok(_) => println!("\nOuter cylinder STL file exported successfully: {}", outer_filename),
-        Err(e) => eprintln!("\nError exporting outer cylinder STL: {}", e),
-    }
+    Ok(())
 }
