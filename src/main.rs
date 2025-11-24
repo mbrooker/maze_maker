@@ -6,6 +6,7 @@ use maze::CylinderMaze;
 use three_d::{make_outer_stl, maze_to_stl};
 
 fn main() -> Result<()> {
+
     let rows = 10;
     let cols = 10;
 
@@ -18,7 +19,7 @@ fn main() -> Result<()> {
     maze.display(start, end);
 
     println!("\nMaze is solvable: {}", maze.can_solve(start, end));
-    maze_to_stl(&maze, 10.0, "cylinder_maze.stl")?;
-    make_outer_stl(10.0, maze.grid().len(), "cylinder_outer.stl")?;
+    maze_to_stl(&maze, 10.0, "cylinder_maze")?;
+    make_outer_stl(10.0, maze.grid().len(), "cylinder_outer")?;
     Ok(())
 }

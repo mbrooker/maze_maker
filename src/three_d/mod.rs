@@ -12,8 +12,9 @@ pub fn maze_to_stl(maze: &CylinderMaze, scale: f64, filename: &str) -> Result<()
     let grid = maze.grid();
     let circ = TAU * scale;
     let seg_scale = circ / grid.len() as f64;
+    let height = seg_scale * grid.len() as f64;
 
-    let mut cylinder = Mesh::cylinder(radius, seg_scale * grid.len() as f64, 360, None);
+    let mut cylinder = Mesh::cylinder(radius, height, 360, None);
     for row in 0..grid.len() {
         for col in 0..grid[row].len() {
             if grid[row][col] == Cell::Path {
@@ -33,9 +34,16 @@ pub fn maze_to_stl(maze: &CylinderMaze, scale: f64, filename: &str) -> Result<()
     let base =
         Mesh::cylinder(radius * 1.1, seg_scale, 1024, None).translate(0.0, 0.0, -seg_scale * 0.99);
     cylinder = base.union(&cylinder);
-    println!("Generating STL");
-    let stl = cylinder.to_stl_binary("my_solid")?;
-    std::fs::write(filename, stl)?;
+    println!("Generating whole STL");
+    std::fs::write(format!("{}_whole.stl", filename), cylinder.to_stl_binary("my_solid")?)?;
+
+    let cube_scale = 3.0 * radius;
+    let cutter = Mesh::cube(1.0, None).scale(cube_scale, cube_scale, height).translate(0.0, -cube_scale / 2.0, 0.0);
+    println!("Generating left STL");
+    let left_mesh = cylinder.intersection(&cutter);
+    std::fs::write(format!("{}_left.stl", filename), left_mesh.to_stl_binary("my_solid")?)?;
+
+
     Ok(())
 }
 
@@ -63,11 +71,10 @@ pub fn make_outer_stl(scale: f64, height_cells: usize, filename: &str) -> Result
     let stl = outer_cylinder
         .difference(&inner_cylinder)
         .union(&base)
-        .union(&tooth_3d)
+        //.union(&tooth_3d)
         .to_stl_binary("outer_cyl")?;
-    std::fs::write(filename, stl)?;
+    std::fs::write(format!("{}.stl", filename), stl)?;
 
-    let t_stl = tooth_3d.to_stl_binary("tooth")?;
-    std::fs::write("tooth.stl", t_stl)?;
+
     Ok(())
 }
