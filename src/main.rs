@@ -54,7 +54,19 @@ fn main() -> Result<()> {
     maze.display(start, end);
 
     println!("\nMaze is solvable: {}", maze.can_solve(start, end));
-    maze_to_openscad(&maze, args.height, args.circumference, &args.maze_file, args.hollow)?;
-    make_outer_openscad(args.height, args.circumference, args.rows, args.cols, &args.outer_file)?;
+    maze_to_openscad(
+        &maze,
+        args.height,
+        args.circumference,
+        &args.maze_file,
+        args.hollow,
+    )?;
+    make_outer_openscad(
+        args.height,
+        args.circumference,
+        maze.grid().len(),
+        maze.grid()[0].len(),
+        &args.outer_file,
+    )?;
     Ok(())
 }
